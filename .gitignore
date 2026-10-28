@@ -1,0 +1,25 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# Environment variables & cloudflare
+.env
+.env.production
+.dev.vars
+.dev.vars.*
+.wrangler/
+_worker.bundle
+_worker.js

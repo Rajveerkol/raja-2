@@ -1,0 +1,91 @@
+:root {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --bg-page: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --border-card: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  
+  --brand-green: #1e3a2f;
+  --brand-green-light: #2d5a49;
+  --accent-dot: #84cc16;
+
+  --btn-download-bg: #f0f7f2;
+  --btn-download-border: #d4ebd9;
+  --btn-download-text: #2d6a4f;
+  --btn-download-hover: #e3f2e7;
+
+  --badge-bg: #f1f5f9;
+  --badge-text: #475569;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 12px 20px -3px rgba(0, 0, 0, 0.08);
+
+  --radius-card: 20px;
+  --radius-icon: 14px;
+  --radius-pill: 9999px;
+}
+
+[data-theme='dark'] {
+  --bg-page: #090d16;
+  --bg-card: #131b2e;
+  --bg-card-hover: #1a243d;
+  --border-card: #1e293b;
+  --border-subtle: #1e293b;
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-light: #64748b;
+
+  --brand-green: #10b981;
+  --brand-green-light: #34d399;
+  --accent-dot: #a3e635;
+
+  --btn-download-bg: #162c24;
+  --btn-download-border: #235340;
+  --btn-download-text: #34d399;
+  --btn-download-hover: #1b3a2e;
+
+  --badge-bg: #1e293b;
+  --badge-text: #cbd5e1;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --shadow-hover: 0 14px 24px -3px rgba(0, 0, 0, 0.6);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  transition: background-color 0.25s ease, color 0.25s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+input {
+  font-family: inherit;
+  outline: none;
+}

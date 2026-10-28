@@ -1,0 +1,24 @@
+# =============================================================================
+# Cloudflare Worker Configuration for Appvizo
+# Shares D1 Database (raxo-db) and Private R2 Bucket (raxo-assets)
+# =============================================================================
+
+name = "appvizo-portal"
+main = "worker/index.ts"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Cloudflare D1 Database Binding (Shared Database)
+[[d1_databases]]
+binding = "DB"
+database_name = "raxo-db"
+database_id = "2741f9fc-37f1-4d2c-88f2-04a4336149b3"
+
+# Cloudflare R2 Storage Bucket Binding (Shared Bucket)
+[[r2_buckets]]
+binding = "RAXO_ASSETS"
+bucket_name = "raxo-assets"
