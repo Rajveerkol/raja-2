@@ -20,7 +20,6 @@ export function App() {
 
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeModalApp, setActiveModalApp] = useState<AppItem | null>(null);
 
   // Theme state: defaults to light mode as shown in the screenshot
@@ -59,37 +58,27 @@ export function App() {
 
   // Filtered Apps List
   const filteredApps = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return apps;
     return apps.filter((app) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
+      return (
         app.name.toLowerCase().includes(q) ||
         (app.category && app.category.toLowerCase().includes(q)) ||
-        (app.badge && app.badge.toLowerCase().includes(q));
-
-      if (!matchesSearch) return false;
-
-      if (selectedCategory === 'all') return true;
-      if (selectedCategory === 'trending') return app.downloads > 1000 || app.badge?.toLowerCase().includes('trending');
-      if (selectedCategory === 'games') return app.category?.toLowerCase().includes('game') || !app.category;
-      if (selectedCategory === 'vip') return app.name.toLowerCase().includes('vip') || app.badge?.toLowerCase().includes('vip');
-
-      return true;
+        (app.badge && app.badge.toLowerCase().includes(q))
+      );
     });
-  }, [apps, searchQuery, selectedCategory]);
+  }, [apps, searchQuery]);
 
   return (
     <div className="app-container">
       {/* 1. Brand Header */}
       <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
 
-      {/* 2. Main Hero / Filter Section */}
+      {/* 2. Main Hero / Search Section */}
       <main className="main-content">
         <FilterBar
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
           totalApps={apps.length}
         />
 
@@ -112,10 +101,10 @@ export function App() {
             <div className="empty-state">
               <div className="empty-icon-box">🔍</div>
               <h3>No Apps Found</h3>
-              <p>No results match "{searchQuery}". Try searching for another name or reset filters.</p>
+              <p>No results match "{searchQuery}". Try searching for another name or reset search.</p>
               <button 
                 className="reset-search-btn"
-                onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}
+                onClick={() => setSearchQuery('')}
               >
                 Show All Apps
               </button>
