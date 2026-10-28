@@ -34,8 +34,8 @@ export default {
     const pathname = url.pathname;
     const method = request.method.toUpperCase();
 
-    // 1. Private R2 Asset Delivery (/assets/*)
-    if (pathname.startsWith('/assets/')) {
+    // 1. Private R2 Asset Delivery (/assets/logos/* or /assets/apks/*)
+    if (pathname.startsWith('/assets/logos/') || pathname.startsWith('/assets/apks/')) {
       if (method !== 'GET' && method !== 'HEAD') {
         return errorResponse('Method Not Allowed', 405);
       }
@@ -48,10 +48,6 @@ export default {
       assetKey = assetKey.replace(/^\/+/, '');
       const isLogo = assetKey.startsWith('logos/');
       const isApk = assetKey.startsWith('apks/');
-
-      if (!isLogo && !isApk) {
-        return errorResponse('Asset path not allowed', 403);
-      }
 
       const filename = assetKey.split('/').pop() || '';
       let contentType = 'application/octet-stream';
