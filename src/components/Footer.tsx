@@ -1,44 +1,64 @@
 import React from 'react';
-import { Shield, Send } from 'lucide-react';
 import { SiteSettings } from '../types';
+import { LegalModalType } from './LegalModals';
 
 interface FooterProps {
   settings: SiteSettings;
+  onOpenLegal: (type: LegalModalType) => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ settings }) => {
+export const Footer: React.FC<FooterProps> = ({ settings, onOpenLegal }) => {
   return (
-    <footer className="app-footer">
-      <div className="footer-container">
-        <div className="footer-top">
-          <div className="footer-brand">
-            <span className="footer-brand-name">
-              appvizo<span className="brand-dot">.</span>
-            </span>
-            <p className="footer-tagline">{settings.siteTagline}</p>
-          </div>
+    <footer className="site-footer">
+      <div className="footer-layout">
+        {/* Row 1: Home   Privacy Policy   Terms of Service */}
+        <nav className="footer-links-row" aria-label="Footer Navigation">
+          <button 
+            type="button" 
+            className="footer-nav-link"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
+            Home
+          </button>
+          <button 
+            type="button" 
+            className="footer-nav-link"
+            onClick={() => onOpenLegal('privacy')}
+          >
+            Privacy Policy
+          </button>
+          <button 
+            type="button" 
+            className="footer-nav-link"
+            onClick={() => onOpenLegal('terms')}
+          >
+            Terms of Service
+          </button>
+        </nav>
 
-          <div className="footer-links">
-            {settings.telegramLink && (
-              <a
-                href={settings.telegramLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="footer-btn telegram-btn"
-              >
-                <Send size={16} />
-                <span>Join Telegram</span>
-              </a>
-            )}
-          </div>
+        {/* Row 2: Contact Us */}
+        <div className="footer-contact-row">
+          <button 
+            type="button" 
+            className="footer-nav-link"
+            onClick={() => onOpenLegal('contact')}
+          >
+            Contact Us
+          </button>
         </div>
 
-        <div className="footer-bottom">
-          <p className="copyright-text">{settings.footerText}</p>
-          <div className="footer-disclaimer">
-            <Shield size={14} />
-            <span>All apps & games are verified malware-free by Appvizo Security Engine.</span>
-          </div>
+        {/* Row 3: © 2026 Appvizo. All rights reserved. */}
+        <div className="footer-copy-row">
+          <p className="footer-copy-text">
+            {settings.footerText || `© 2026 ${settings.siteName || 'Appvizo'}. All rights reserved.`}
+          </p>
+        </div>
+
+        {/* Row 4: Meta / Facebook Disclaimer */}
+        <div className="footer-disclaimer-row">
+          <p className="footer-disclaimer-text">
+            Disclaimer: This website is not part of the Facebook website or Meta Platforms, Inc. Additionally, this site is NOT endorsed by Facebook in any way. FACEBOOK is a trademark of META PLATFORMS, INC.
+          </p>
         </div>
       </div>
     </footer>

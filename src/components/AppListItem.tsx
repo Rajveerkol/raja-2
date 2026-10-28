@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, ShieldCheck, Check, Sparkles, Star } from 'lucide-react';
+import { Download, ShieldCheck, Check, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AppItem } from '../types';
 import { buildDownloadUrl, incrementDownloads } from '../apiClient';
@@ -65,31 +65,25 @@ export const AppListItem: React.FC<AppListItemProps> = ({ app, onOpenDetails }) 
               'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="%2310b981"><rect width="100" height="100" rx="24"/><text x="50" y="55" font-size="28" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">APK</text></svg>';
           }}
         />
-        <div className="verified-mini-badge" title="Verified Clean APK">
-          <ShieldCheck size={12} />
-        </div>
       </div>
 
-      {/* 2. App Meta Information */}
+      {/* 2. App Meta Information (Matching Raxo: ★ 4.9 • Verified) */}
       <div className="app-info-col">
-        <div className="app-title-row">
-          <h3 className="app-title">{app.name}</h3>
-          {app.badge && <span className="app-badge-tag">{app.badge}</span>}
-        </div>
-
-        <div className="app-sub-meta">
-          <span className="meta-rating">
-            <Star size={12} className="star-icon" fill="currentColor" />
-            {app.rating.toFixed(1)}
+        <h3 className="app-title">{app.name}</h3>
+        <div className="card-meta">
+          <span className="rating-badge">
+            <Star size={13} className="star-icon" fill="currentColor" />
+            <span>{app.rating.toFixed(1)}</span>
           </span>
-          <span className="meta-dot">•</span>
-          <span className="meta-size">{app.size || '35 MB'}</span>
-          <span className="meta-dot">•</span>
-          <span className="meta-downloads">{app.downloads.toLocaleString()} dl</span>
+          <span className="meta-bullet">•</span>
+          <span className="verified-badge">
+            <ShieldCheck size={13} className="verified-icon" />
+            <span>{app.badge || 'Verified'}</span>
+          </span>
         </div>
       </div>
 
-      {/* 3. Action Download Button (Matching Screenshot + Tagda Upgrade) */}
+      {/* 3. Action Download Button */}
       <div className="app-action-col">
         <button
           className={`download-btn ${downloadSuccess ? 'downloaded' : ''}`}

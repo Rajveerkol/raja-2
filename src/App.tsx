@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
-import { FilterBar } from './components/FilterBar';
 import { AppListItem } from './components/AppListItem';
 import { AppModal } from './components/AppModal';
 import { Footer } from './components/Footer';
+import { LegalModals, LegalModalType } from './components/LegalModals';
 import { AppItem, SiteSettings } from './types';
 import { fetchApps, fetchSettings } from './apiClient';
 import './App.css';
@@ -19,10 +19,10 @@ export function App() {
   });
 
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [activeModalApp, setActiveModalApp] = useState<AppItem | null>(null);
+  const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
 
-  // Theme state: defaults to light mode as shown in the screenshot
+  // Theme state: defaults to light mode
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('appvizo_theme');
@@ -56,33 +56,14 @@ export function App() {
     loadData();
   }, []);
 
-  // Filtered Apps List
-  const filteredApps = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return apps;
-    return apps.filter((app) => {
-      return (
-        app.name.toLowerCase().includes(q) ||
-        (app.category && app.category.toLowerCase().includes(q)) ||
-        (app.badge && app.badge.toLowerCase().includes(q))
-      );
-    });
-  }, [apps, searchQuery]);
-
   return (
     <div className="app-container">
       {/* 1. Brand Header */}
       <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
 
-      {/* 2. Main Hero / Search Section */}
+      {/* 2. Main Content (No Search Button / Bar) */}
       <main className="main-content">
-        <FilterBar
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          totalApps={apps.length}
-        />
-
-        {/* 3. The Core App List Card (Matching the user screenshot + Tagda Upgrade) */}
+        {/* Core App List Card (Matching user reference + Raxo style meta) */}
         <section className="app-card-container">
           {loading ? (
             <div className="skeleton-list">
@@ -97,21 +78,15 @@ export function App() {
                 </div>
               ))}
             </div>
-          ) : filteredApps.length === 0 ? (
+          ) : apps.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon-box">🔍</div>
-              <h3>No Apps Found</h3>
-              <p>No results match "{searchQuery}". Try searching for another name or reset search.</p>
-              <button 
-                className="reset-search-btn"
-                onClick={() => setSearchQuery('')}
-              >
-                Show All Apps
-              </button>
+              <div className="empty-icon-box">📱</div>
+              <h3>Apps Updating</h3>
+              <p>Applications are currently being prepared. Please check back shortly.</p>
             </div>
           ) : (
             <div className="app-items-list">
-              {filteredApps.map((app) => (
+              {apps.map((app) => (
                 <AppListItem
                   key={app.id}
                   app={app}
@@ -123,14 +98,24 @@ export function App() {
         </section>
       </main>
 
-      {/* 4. Quick Details Modal */}
+      {/* 3. Quick Details Modal */}
       <AppModal
         app={activeModalApp}
         onClose={() => setActiveModalApp(null)}
       />
 
-      {/* 5. Minimal Footer */}
-      <Footer settings={settings} />
+      {/* 4. Footer Matching Raxo */}
+      <Footer 
+        settings={settings} 
+        onOpenLegal={(type) => setActiveLegalModal(type)}
+      />
+
+      {/* 5. Legal & Contact Modals (Privacy Policy, Terms of Service, Contact Us) */}
+      <LegalModals 
+        activeModal={activeLegalModal}
+        onClose={() => setActiveLegalModal(null)}
+        settings={settings}
+      />
     </div>
   );
 }
