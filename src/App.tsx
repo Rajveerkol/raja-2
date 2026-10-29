@@ -4,8 +4,9 @@ import { AppListItem } from './components/AppListItem';
 import { AppModal } from './components/AppModal';
 import { Footer } from './components/Footer';
 import { LegalModals, LegalModalType } from './components/LegalModals';
+import { AdminPage } from './components/AdminPage';
 import { AppItem, SiteSettings } from './types';
-import { fetchApps, fetchSettings } from './apiClient';
+import { fetchCloudflareApps, fetchCloudflareSettings } from './cloudflareClient';
 import './App.css';
 
 export function App() {
@@ -21,6 +22,14 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [activeModalApp, setActiveModalApp] = useState<AppItem | null>(null);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
+  const [secretClicks, setSecretClicks] = useState(0);
+
+  // Admin route detection
+  const [isAdminRoute, setIsAdminRoute] = useState<boolean>(() => {
+    const p = window.location.pathname.toLowerCase();
+    const h = window.location.hash.toLowerCase();
+    return p === '/admin' || p.startsWith('/admin/') || h === '#admin';
+  });
 
   // Theme state: defaults to light mode
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -41,29 +50,123 @@ export function App() {
 
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
 
-  // Load live data from shared D1 database
+  // Check URL hash for modal opening on load / change
+  useEffect(() => {
+    const handleHash = () => {
+      const h = window.location.hash.toLowerCase();
+      if (h === '#privacy') setActiveLegalModal('privacy');
+      else if (h === '#terms') setActiveLegalModal('terms');
+      else if (h === '#contact') setActiveLegalModal('contact');
+      else if (h === '#admin') setIsAdminRoute(true);
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
+  // Route listener: listen to popstate and hashchange
+  useEffect(() => {
+    const checkRoute = () => {
+      const p = window.location.pathname.toLowerCase();
+      const h = window.location.hash.toLowerCase();
+      const isAdmin = p === '/admin' || p.startsWith('/admin/') || h === '#admin';
+      setIsAdminRoute(isAdmin);
+    };
+
+    window.addEventListener('popstate', checkRoute);
+    window.addEventListener('hashchange', checkRoute);
+    return () => {
+      window.removeEventListener('popstate', checkRoute);
+      window.removeEventListener('hashchange', checkRoute);
+    };
+  }, []);
+
+  // Dynamic document title update
+  useEffect(() => {
+    if (isAdminRoute) {
+      document.title = `Admin Dashboard - ${settings.siteName}`;
+    } else {
+      document.title = `${settings.siteName} - ${settings.siteTagline}`;
+    }
+  }, [settings, isAdminRoute]);
+
+  // Navigate helpers
+  const navigateToAdmin = () => {
+    setIsAdminRoute(true);
+    if (window.location.pathname.toLowerCase() !== '/admin') {
+      window.history.pushState({}, '', '/admin');
+    }
+  };
+
+  const navigateToHome = () => {
+    setIsAdminRoute(false);
+    if (window.location.pathname.toLowerCase().startsWith('/admin') || window.location.hash === '#admin') {
+      window.history.pushState({}, '', '/');
+    }
+  };
+
+  // Keyboard shortcut listener: 'Ctrl + Shift + A' toggles admin page
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        if (isAdminRoute) navigateToHome();
+        else navigateToAdmin();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAdminRoute]);
+
+  // Secret footer click to open admin
+  const handleSecretFooterClick = () => {
+    setSecretClicks((prev) => {
+      const next = prev + 1;
+      if (next >= 3) {
+        navigateToAdmin();
+        return 0;
+      }
+      return next;
+    });
+  };
+
+  // Load live data from independent D1 database (appvizo-db)
   useEffect(() => {
     async function loadData() {
       setLoading(true);
       const [appsData, settingsData] = await Promise.all([
-        fetchApps(),
-        fetchSettings()
+        fetchCloudflareApps(5000, isAdminRoute),
+        fetchCloudflareSettings(4000)
       ]);
-      setApps(appsData);
-      setSettings(settingsData);
+      if (appsData) setApps(appsData);
+      if (settingsData) setSettings(settingsData);
       setLoading(false);
     }
     loadData();
-  }, []);
+  }, [isAdminRoute]);
 
+  // If on admin route -> Render Dedicated Full-Page Admin Dashboard
+  if (isAdminRoute) {
+    return (
+      <AdminPage
+        apps={apps}
+        setApps={setApps}
+        settings={settings}
+        setSettings={setSettings}
+        onNavigateHome={navigateToHome}
+      />
+    );
+  }
+
+  // Public visitor view
   return (
     <div className="app-container">
       {/* 1. Brand Header */}
       <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
 
-      {/* 2. Main Content (No Search Button / Bar) */}
+      {/* 2. Main Content */}
       <main className="main-content">
-        {/* Core App List Card (Matching user reference + Raxo style meta) */}
         <section className="app-card-container">
           {loading ? (
             <div className="skeleton-list">
@@ -86,13 +189,15 @@ export function App() {
             </div>
           ) : (
             <div className="app-items-list">
-              {apps.map((app) => (
-                <AppListItem
-                  key={app.id}
-                  app={app}
-                  onOpenDetails={(selected) => setActiveModalApp(selected)}
-                />
-              ))}
+              {apps
+                .filter((app) => app.status === 'active')
+                .map((app) => (
+                  <AppListItem
+                    key={app.id}
+                    app={app}
+                    onOpenDetails={(selected) => setActiveModalApp(selected)}
+                  />
+                ))}
             </div>
           )}
         </section>
@@ -108,14 +213,21 @@ export function App() {
       <Footer 
         settings={settings} 
         onOpenLegal={(type) => setActiveLegalModal(type)}
+        onSecretClick={handleSecretFooterClick}
       />
 
       {/* 5. Legal & Contact Modals (Privacy Policy, Terms of Service, Contact Us) */}
       <LegalModals 
         activeModal={activeLegalModal}
-        onClose={() => setActiveLegalModal(null)}
+        onClose={() => {
+          setActiveLegalModal(null);
+          if (window.location.hash.startsWith('#')) {
+            window.history.pushState(null, '', window.location.pathname);
+          }
+        }}
         settings={settings}
       />
     </div>
   );
 }
+export default App;

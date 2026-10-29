@@ -5,9 +5,10 @@ import { LegalModalType } from './LegalModals';
 interface FooterProps {
   settings: SiteSettings;
   onOpenLegal: (type: LegalModalType) => void;
+  onSecretClick?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ settings, onOpenLegal }) => {
+export const Footer: React.FC<FooterProps> = ({ settings, onOpenLegal, onSecretClick }) => {
   return (
     <footer className="site-footer">
       <div className="footer-layout">
@@ -49,7 +50,12 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenLegal }) => {
 
         {/* Row 3: © 2026 Appvizo. All rights reserved. */}
         <div className="footer-copy-row">
-          <p className="footer-copy-text">
+          <p 
+            className="footer-copy-text"
+            onClick={onSecretClick}
+            title={settings.siteName || 'Appvizo'}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
             {settings.footerText || `© 2026 ${settings.siteName || 'Appvizo'}. All rights reserved.`}
           </p>
         </div>
