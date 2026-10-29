@@ -197,9 +197,14 @@ export default {
       if (isLogo) {
         const ext = filename.split('.').pop()?.toLowerCase();
         if (ext === 'png') contentType = 'image/png';
-        else if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
+        else if (ext === 'jpg' || ext === 'jpeg' || ext === 'jfif') contentType = 'image/jpeg';
         else if (ext === 'webp') contentType = 'image/webp';
-        else return errorResponse('Unsupported image format', 400);
+        else if (ext === 'svg') contentType = 'image/svg+xml';
+        else if (ext === 'gif') contentType = 'image/gif';
+        else if (ext === 'avif') contentType = 'image/avif';
+        else if (ext === 'ico') contentType = 'image/x-icon';
+        else if (ext === 'bmp') contentType = 'image/bmp';
+        else contentType = 'image/png';
       } else if (isApk) {
         if (!filename.toLowerCase().endsWith('.apk')) {
           return errorResponse('Only .apk packages are permitted', 400);
@@ -224,7 +229,8 @@ export default {
             status: 304,
             headers: {
               'ETag': object.httpEtag,
-              'Cache-Control': isLogo ? 'public, max-age=604800' : 'public, max-age=86400'
+              'Cache-Control': isLogo ? 'public, max-age=604800, stale-while-revalidate=86400' : 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*'
             }
           });
         }
@@ -406,16 +412,41 @@ export default {
         return errorResponse('Logo image exceeds the maximum 5 MB size limit', 400);
       }
 
-      const mimeType = fileEntry.type.toLowerCase();
-      let ext = '';
-      if (mimeType === 'image/png' || fileEntry.name.toLowerCase().endsWith('.png')) {
-        ext = 'png';
-      } else if (mimeType === 'image/jpeg' || fileEntry.name.toLowerCase().endsWith('.jpg') || fileEntry.name.toLowerCase().endsWith('.jpeg')) {
-        ext = 'jpg';
-      } else if (mimeType === 'image/webp' || fileEntry.name.toLowerCase().endsWith('.webp')) {
+      const rawType = (fileEntry.type || '').toLowerCase();
+      const lowerName = (fileEntry.name || '').toLowerCase();
+
+      let ext = 'png';
+      let resolvedContentType = 'image/png';
+
+      if (rawType.includes('svg') || lowerName.endsWith('.svg')) {
+        ext = 'svg';
+        resolvedContentType = 'image/svg+xml';
+      } else if (rawType.includes('webp') || lowerName.endsWith('.webp')) {
         ext = 'webp';
+        resolvedContentType = 'image/webp';
+      } else if (rawType.includes('png') || lowerName.endsWith('.png')) {
+        ext = 'png';
+        resolvedContentType = 'image/png';
+      } else if (rawType.includes('jpeg') || rawType.includes('jpg') || lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg') || lowerName.endsWith('.jfif')) {
+        ext = 'jpg';
+        resolvedContentType = 'image/jpeg';
+      } else if (rawType.includes('gif') || lowerName.endsWith('.gif')) {
+        ext = 'gif';
+        resolvedContentType = 'image/gif';
+      } else if (rawType.includes('avif') || lowerName.endsWith('.avif')) {
+        ext = 'avif';
+        resolvedContentType = 'image/avif';
+      } else if (rawType.includes('icon') || rawType.includes('ico') || lowerName.endsWith('.ico')) {
+        ext = 'ico';
+        resolvedContentType = 'image/x-icon';
+      } else if (rawType.includes('bmp') || lowerName.endsWith('.bmp')) {
+        ext = 'bmp';
+        resolvedContentType = 'image/bmp';
+      } else if (rawType.startsWith('image/')) {
+        ext = 'png';
+        resolvedContentType = rawType;
       } else {
-        return errorResponse('Unsupported image type. Permitted formats: PNG, JPG/JPEG, WEBP', 400);
+        return errorResponse('Unsupported image type. Permitted formats: PNG, JPG/JPEG, WEBP, SVG, GIF, AVIF, ICO', 400);
       }
 
       const baseName = fileEntry.name.replace(/\.[^/.]+$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'logo';
@@ -429,7 +460,7 @@ export default {
       try {
         await bucket.put(r2Key, fileEntry.stream(), {
           httpMetadata: {
-            contentType: mimeType.startsWith('image/') ? mimeType : (ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg')
+            contentType: resolvedContentType
           }
         });
 

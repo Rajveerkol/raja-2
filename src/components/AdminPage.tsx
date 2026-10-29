@@ -56,6 +56,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [downloadUrl, setDownloadUrl] = useState('');
   const [logo, setLogo] = useState('');
   const [logoPreview, setLogoPreview] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [rating, setRating] = useState(4.9);
   const [badge, setBadge] = useState('Verified');
   const [category, setCategory] = useState('Games');
@@ -162,21 +163,32 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setFormError('Image file is too large (max 5MB)');
+      if (file.size > 10 * 1024 * 1024) {
+        setFormError('Logo image is too large (max 10MB)');
         return;
       }
+      try {
+        const localPreview = URL.createObjectURL(file);
+        setLogoPreview(localPreview);
+      } catch (err) {}
+
+      setIsUploadingLogo(true);
+      setFormError('');
+      setFormSuccess('Uploading logo to Cloudflare R2 storage...');
+
       try {
         const result = await uploadCloudflareLogo(file);
         if (result.url) {
           setLogo(result.url);
           setLogoPreview(result.url);
-          setFormSuccess('Logo uploaded to R2 successfully!');
+          setFormSuccess('Logo uploaded to Cloudflare R2 successfully!');
         } else {
           setFormError(result.error || 'Failed to upload logo to R2');
         }
       } catch (err: any) {
         setFormError(err?.message || 'Error uploading logo');
+      } finally {
+        setIsUploadingLogo(false);
       }
     }
   };
@@ -324,6 +336,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Save App (Add or Update)
   const handleSaveApp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUploadingLogo) {
+      setFormError('Please wait for the logo upload to finish before saving.');
+      return;
+    }
+    if (isUploadingApk) {
+      setFormError('Please wait for the APK upload to finish before saving.');
+      return;
+    }
     if (!name.trim()) {
       setFormError('App name is required.');
       return;
@@ -360,7 +380,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         downloadUrl: resolvedDownloadUrl,
         apkFileName: resolvedApkFileName,
         buttonText: buttonText.trim() || 'Download APK',
-        logo: logo.trim() || '/uploads/logos/nexo.svg',
+        logo: logo.trim() || `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%236366f1'/><text x='50' y='58' font-size='34' font-weight='bold' fill='%23ffffff' text-anchor='middle'>${encodeURIComponent(name.trim().slice(0, 2).toUpperCase() || 'AP')}</text></svg>`,
         rating: Number(rating) || 4.9,
         badge: badge.trim() || 'Verified',
         category: category.trim() || 'Games',
@@ -400,7 +420,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         downloadUrl: resolvedDownloadUrl,
         apkFileName: resolvedApkFileName,
         buttonText: buttonText.trim() || 'Download APK',
-        logo: logo.trim() || '/uploads/logos/nexo.svg',
+        logo: logo.trim() || `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%236366f1'/><text x='50' y='58' font-size='34' font-weight='bold' fill='%23ffffff' text-anchor='middle'>${encodeURIComponent(name.trim().slice(0, 2).toUpperCase() || 'AP')}</text></svg>`,
         rating: Number(rating) || 4.9,
         badge: badge.trim() || 'Verified',
         category: category.trim() || 'Games',
@@ -1372,7 +1392,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     <div className="logo-uploader-card">
                       <div className="logo-preview-box">
                         {logoPreview ? (
-                          <img src={logoPreview} alt="Preview" className="logo-preview-img" />
+                          <img src={logoPreview} alt="Preview" className="logo-preview-img" referrerPolicy="no-referrer" />
                         ) : (
                           <ImageIcon size={26} color="#ffffff" />
                         )}
@@ -1392,13 +1412,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     </div>
                   </div>
 
-                  {/* External Logo URL */}
+                  {/* External Logo URL or R2 Key */}
                   <div className="form-col-full">
-                    <label className="field-label">Or External Image URL</label>
+                    <label className="field-label">Or External Image URL / Storage Path</label>
                     <input 
-                      type="url" 
+                      type="text" 
                       className="field-input" 
-                      placeholder="https://example.com/logo.png"
+                      placeholder="https://example.com/logo.png or /assets/logos/..."
                       value={logo.startsWith('data:') ? '' : logo}
                       onChange={e => {
                         setLogo(e.target.value);
@@ -1434,8 +1454,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                  <button type="submit" className="btn-primary-purple" style={{ padding: '12px 28px' }} disabled={isUploadingApk}>
-                    {isUploadingApk ? 'Uploading APK File...' : (editingAppId ? 'Update Application' : 'Publish Application')}
+                  <button type="submit" className="btn-primary-purple" style={{ padding: '12px 28px' }} disabled={isUploadingApk || isUploadingLogo}>
+                    {isUploadingLogo ? 'Uploading Logo...' : isUploadingApk ? 'Uploading APK File...' : (editingAppId ? 'Update Application' : 'Publish Application')}
                   </button>
                   <button 
                     type="button" 
