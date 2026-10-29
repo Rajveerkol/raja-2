@@ -58,7 +58,8 @@ export const AppListItem: React.FC<AppListItemProps> = ({ app, onOpenDetails }) 
           src={app.logo}
           alt={app.name}
           className="app-icon-img"
-          loading="lazy"
+          loading="eager"
+          decoding="async"
           referrerPolicy="no-referrer"
           onError={(e) => {
             // Fallback icon if logo fails
