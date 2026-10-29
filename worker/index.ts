@@ -1,11 +1,12 @@
 // =============================================================================
 // Cloudflare Worker for Appvizo
-// Connects directly to shared D1 (raxo-db) and shared private R2 (raxo-assets)
+// Connects to independent D1 (appvizo-db) and independent private R2 (appvizo-assets)
 // =============================================================================
 
 export interface Env {
   DB: D1Database;
-  RAXO_ASSETS: R2Bucket;
+  APPVIZO_ASSETS?: R2Bucket;
+  RAXO_ASSETS?: R2Bucket;
   ASSETS: {
     fetch: (request: Request | string) => Promise<Response>;
   };
@@ -65,8 +66,13 @@ export default {
         contentType = 'application/vnd.android.package-archive';
       }
 
+      const bucket = env.APPVIZO_ASSETS || env.RAXO_ASSETS;
+      if (!bucket) {
+        return errorResponse('Storage bucket not configured', 500);
+      }
+
       try {
-        const object = await env.RAXO_ASSETS.get(assetKey);
+        const object = await bucket.get(assetKey);
         if (!object) {
           return errorResponse('Asset not found', 404);
         }
