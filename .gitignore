@@ -24,4 +24,3 @@ dist-ssr
 _worker.bundle
 _worker.js
 *.py
-*.sql
