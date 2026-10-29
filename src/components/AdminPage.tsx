@@ -37,10 +37,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   setSettings,
   onNavigateHome
 }) => {
-  // Session authentication state
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('appvizo_admin_auth') === 'true' || sessionStorage.getItem('raxo_admin_auth') === 'true';
-  });
+  // Session authentication state - verified directly with server
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
 
   // Login form state
   const [passwordInput, setPasswordInput] = useState('');
@@ -100,16 +99,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
   // Verify server-side HttpOnly session cookie on mount
   useEffect(() => {
+    let isMounted = true;
     checkAdminSession().then(valid => {
-      if (valid) {
-        setIsAuthenticated(true);
+      if (!isMounted) return;
+      setIsAuthenticated(valid);
+      if (!valid) {
+        sessionStorage.removeItem('appvizo_admin_auth');
+        sessionStorage.removeItem('raxo_admin_auth');
+      }
+      setIsCheckingAuth(false);
+    }).catch(() => {
+      if (isMounted) {
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
       }
     });
+    return () => { isMounted = false; };
   }, []);
 
   // Save auth to sessionStorage for fallback UI state
   useEffect(() => {
     if (isAuthenticated) {
+      sessionStorage.setItem('raxo_admin_auth', 'true');
       sessionStorage.setItem('appvizo_admin_auth', 'true');
     } else {
       sessionStorage.removeItem('appvizo_admin_auth');
@@ -125,7 +136,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       const res = await loginAdmin(passwordInput);
       if (res.success) {
         setIsAuthenticated(true);
+        sessionStorage.setItem('raxo_admin_auth', 'true');
+        sessionStorage.setItem('appvizo_admin_auth', 'true');
         setPasswordInput('');
+        const fresh = await fetchSupabaseApps(5000, true);
+        if (fresh && fresh.length > 0) {
+          setApps(fresh);
+        }
       } else {
         setLoginError(res.error || 'Invalid password. Please try again.');
       }
@@ -154,9 +171,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         if (result.url) {
           setLogo(result.url);
           setLogoPreview(result.url);
-          setFormSuccess('Logo uploaded successfully!');
+          setFormSuccess('Logo uploaded to R2 successfully!');
         } else {
-          setFormError(result.error || 'Failed to upload logo');
+          setFormError(result.error || 'Failed to upload logo to R2');
         }
       } catch (err: any) {
         setFormError(err?.message || 'Error uploading logo');
@@ -354,12 +371,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         description: description.trim()
       };
 
+      const res = await upsertSupabaseApp(updatedItem);
+      if (!res.success) {
+        if (res.status === 401 || res.error?.includes('Unauthorized')) {
+          setIsAuthenticated(false);
+          sessionStorage.removeItem('appvizo_admin_auth');
+          sessionStorage.removeItem('raxo_admin_auth');
+          setLoginError('Your admin session has expired. Please enter password to log in again.');
+          return;
+        }
+        setFormError(res.error || 'Failed to save application to database.');
+        return;
+      }
+
       const updated = apps.map(app => (app.id === editingAppId ? updatedItem : app));
       setApps(updated);
-
-      if (isSupabaseConfigured()) {
-        await upsertSupabaseApp(updatedItem);
-      }
 
       setFormSuccess(`App "${name}" updated & saved to Database successfully!`);
       setTimeout(() => {
@@ -385,11 +411,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         description: description.trim()
       };
 
-      setApps([newApp, ...apps]);
-
-      if (isSupabaseConfigured()) {
-        await upsertSupabaseApp(newApp);
+      const res = await upsertSupabaseApp(newApp);
+      if (!res.success) {
+        if (res.status === 401 || res.error?.includes('Unauthorized')) {
+          setIsAuthenticated(false);
+          sessionStorage.removeItem('appvizo_admin_auth');
+          sessionStorage.removeItem('raxo_admin_auth');
+          setLoginError('Your admin session has expired. Please enter password to log in again.');
+          return;
+        }
+        setFormError(res.error || 'Failed to save application to database.');
+        return;
       }
+
+      setApps([newApp, ...apps]);
 
       setFormSuccess(`App "${name}" published & saved to Database successfully!`);
       setTimeout(() => {
@@ -402,10 +437,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Delete App
   const handleDeleteApp = async (id: string, appName: string) => {
     if (window.confirm(`Are you sure you want to delete "${appName}"?`)) {
-      setApps(apps.filter(a => a.id !== id));
-      if (isSupabaseConfigured()) {
-        await deleteSupabaseApp(id);
+      const res = await deleteSupabaseApp(id);
+      if (!res.success) {
+        if (res.status === 401 || res.error?.includes('Unauthorized')) {
+          setIsAuthenticated(false);
+          sessionStorage.removeItem('appvizo_admin_auth');
+          sessionStorage.removeItem('raxo_admin_auth');
+          alert('Your admin session has expired. Please log in again.');
+          return;
+        }
+        alert(`Failed to delete "${appName}": ${res.error || 'Server error'}`);
+        return;
       }
+      setApps(apps.filter(a => a.id !== id));
     }
   };
 
@@ -413,11 +457,23 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const handleClearAllApps = async () => {
     if (window.confirm('Are you sure you want to delete all listed applications? This will clear them from both the website and database.')) {
       const appsToDelete = [...apps];
-      setApps([]);
-      if (isSupabaseConfigured()) {
-        for (const app of appsToDelete) {
-          await deleteSupabaseApp(app.id);
+      let hasError = false;
+      for (const app of appsToDelete) {
+        const res = await deleteSupabaseApp(app.id);
+        if (!res.success) {
+          hasError = true;
+          if (res.status === 401) {
+            setIsAuthenticated(false);
+            alert('Your session has expired. Please log in again.');
+            return;
+          }
         }
+      }
+      if (!hasError) {
+        setApps([]);
+      } else {
+        const fresh = await fetchSupabaseApps(5000, true);
+        if (fresh) setApps(fresh);
       }
     }
   };
@@ -425,13 +481,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Sync Apps from Cloud Database
   const handleResetApps = async () => {
     if (window.confirm('Re-sync and fetch latest apps from Cloud Database?')) {
-      if (isSupabaseConfigured()) {
-        const fresh = await fetchSupabaseApps();
-        if (fresh && fresh.length > 0) {
-          setApps(fresh);
-          setFormSuccess('Apps synchronized from Cloud Database successfully!');
-          return;
-        }
+      const fresh = await fetchSupabaseApps(5000, true);
+      if (fresh && fresh.length > 0) {
+        setApps(fresh);
+        setFormSuccess('Apps synchronized from Cloud Database successfully!');
+        return;
       }
       alert('Cloud Database is up to date.');
     }
@@ -447,12 +501,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       footerText,
       telegramLink
     };
-    setSettings(newSettings);
 
-    if (isSupabaseConfigured()) {
-      await updateSupabaseSettings(newSettings);
+    const res = await updateSupabaseSettings(newSettings);
+    if (!res.success) {
+      if (res.status === 401 || res.error?.includes('Unauthorized')) {
+        setIsAuthenticated(false);
+        sessionStorage.removeItem('appvizo_admin_auth');
+        sessionStorage.removeItem('raxo_admin_auth');
+        alert('Your admin session has expired. Please log in again.');
+        return;
+      }
+      alert(`Failed to update settings: ${res.error || 'Unknown error'}`);
+      return;
     }
 
+    setSettings(newSettings);
     setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 2000);
   };
@@ -532,6 +595,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const activeCount = apps.filter(a => a.status === 'active').length;
 
   // =========================================================================
+  // VIEW 0: Session Checking Spinner
+  // =========================================================================
+  if (isCheckingAuth) {
+    return (
+      <div className="admin-page-root admin-login-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', fontWeight: 600 }}>
+          <RefreshCw className="animate-spin" size={20} />
+          <span>Verifying administrator session...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
   // VIEW 1: Dedicated Full Page Login Screen
   // =========================================================================
   if (!isAuthenticated) {
@@ -541,7 +618,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           <div className="login-brand-icon">
             <Rocket size={28} />
           </div>
-          <h1 className="login-title">Appvizo Admin Portal</h1>
+          <h1 className="login-title">{settings.siteName || 'Raxo'} Admin Portal</h1>
           <p className="login-subtitle">
             Sign in with your administrator password to manage applications, download links, and database settings.
           </p>
@@ -630,7 +707,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="admin-brand-title">Appvizo</span>
+                <span className="admin-brand-title">{settings.siteName || 'Raxo'}</span>
                 <span className="admin-badge-role">Admin Console</span>
                 {isSupabaseConfigured() && (
                   <span style={{ fontSize: '0.72rem', background: '#ecfdf5', color: '#059669', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -1387,7 +1464,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
             <div className="admin-form-container">
               <p style={{ color: '#64748b', fontSize: '0.92rem', marginBottom: '20px' }}>
-                Your Appvizo application runs on a fully isolated, production-grade Cloudflare stack. Database and file storage are completely independent from other websites.
+                Your Appvizo application runs on a fully isolated, production-grade Cloudflare stack. Database and file storage are completely integrated with Cloudflare D1 and R2.
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
