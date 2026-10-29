@@ -23,36 +23,57 @@ export interface UploadAssetResult {
 /**
  * Fetch all apps from Cloudflare D1 with timeout guard
  */
-export async function fetchCloudflareApps(timeoutMs = 5000, all = false): Promise<AppItem[] | null> {
+export async function fetchCloudflareApps(timeoutMs = 8000, all = false): Promise<AppItem[] | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const url = all ? '/api/apps?all=true' : '/api/apps';
+    const fetchHeaders: Record<string, string> = { 'Accept': 'application/json' };
+    
+    // Only bypass edge cache for admin panel (?all=true)
+    if (all) {
+      fetchHeaders['Cache-Control'] = 'no-cache';
+    }
+
     const res = await fetch(url, {
       method: 'GET',
-      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
-      cache: 'no-cache',
+      headers: fetchHeaders,
       signal: controller.signal
     });
 
     clearTimeout(timer);
 
-    if (!res.ok) {
-      console.warn(`Cloudflare apps fetch returned HTTP ${res.status}`);
-      return null;
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data as AppItem[];
+      }
     }
 
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      return data as AppItem[];
+    // If Cloudflare Worker hits Error 1027 plan limits (429) or cold-start error,
+    // seamlessly fallback to static CDN-hosted apps catalog
+    console.warn(`Cloudflare apps API returned status ${res.status}. Falling back to static CDN catalog...`);
+    const fallbackRes = await fetch('/apps-catalog.json', { headers: { 'Accept': 'application/json' } });
+    if (fallbackRes.ok) {
+      const fallbackData = await fallbackRes.json();
+      if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+        return fallbackData as AppItem[];
+      }
     }
-    return [];
+
+    return null;
   } catch (err: any) {
     clearTimeout(timer);
-    if (err?.name !== 'AbortError') {
-      console.error('Failed to fetch apps from Cloudflare D1:', err);
-    }
+    try {
+      const fallbackRes = await fetch('/apps-catalog.json', { headers: { 'Accept': 'application/json' } });
+      if (fallbackRes.ok) {
+        const fallbackData = await fallbackRes.json();
+        if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+          return fallbackData as AppItem[];
+        }
+      }
+    } catch {}
     return null;
   }
 }

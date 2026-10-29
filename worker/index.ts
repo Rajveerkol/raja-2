@@ -493,7 +493,7 @@ export default {
           const apps = (results || []).map(formatRowToAppItem);
 
           return jsonResponse(apps, 200, {
-            'Cache-Control': fetchAll ? 'no-cache, no-store, must-revalidate' : 'public, max-age=60, stale-while-revalidate=300'
+            'Cache-Control': fetchAll ? 'no-cache, no-store, must-revalidate' : 'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
           });
         } catch (err: any) {
           return errorResponse(`Database error: ${err?.message}`, 500);

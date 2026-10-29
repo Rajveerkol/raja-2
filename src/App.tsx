@@ -6,11 +6,15 @@ import { Footer } from './components/Footer';
 import { LegalModals, LegalModalType } from './components/LegalModals';
 import { AdminPage } from './components/AdminPage';
 import { AppItem, SiteSettings } from './types';
+import { loadStoredApps, saveStoredApps, loadStoredSettings, saveStoredSettings, INITIAL_APPS } from './data';
 import { fetchCloudflareApps, fetchCloudflareSettings } from './cloudflareClient';
 import './App.css';
 
 export function App() {
-  const [apps, setApps] = useState<AppItem[]>([]);
+  const [apps, setApps] = useState<AppItem[]>(() => {
+    const cached = loadStoredApps();
+    return Array.isArray(cached) && cached.length > 0 ? cached : INITIAL_APPS;
+  });
   const [settings, setSettings] = useState<SiteSettings>({
     siteName: 'Appvizo',
     siteTagline: 'Discover & Download Verified Apps & Games',
@@ -19,7 +23,10 @@ export function App() {
     telegramLink: 'https://t.me/appvizo_official'
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = loadStoredApps();
+    return !cached || cached.length === 0;
+  });
   const [activeModalApp, setActiveModalApp] = useState<AppItem | null>(null);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
   const [secretClicks, setSecretClicks] = useState(0);
@@ -131,17 +138,32 @@ export function App() {
     });
   };
 
-  // Load live data from independent D1 database (appvizo-db)
+  // Load live data with graceful offline/CDN fallback
   useEffect(() => {
     async function loadData() {
-      setLoading(true);
-      const [appsData, settingsData] = await Promise.all([
-        fetchCloudflareApps(5000, isAdminRoute),
-        fetchCloudflareSettings(4000)
-      ]);
-      if (appsData) setApps(appsData);
-      if (settingsData) setSettings(settingsData);
-      setLoading(false);
+      try {
+        const [appsData, settingsData] = await Promise.all([
+          fetchCloudflareApps(7000, isAdminRoute),
+          fetchCloudflareSettings(4000)
+        ]);
+        if (appsData && appsData.length > 0) {
+          setApps(appsData);
+          saveStoredApps(appsData);
+        } else {
+          const fallback = loadStoredApps();
+          if (fallback && fallback.length > 0) setApps(fallback);
+        }
+        if (settingsData) {
+          setSettings(settingsData);
+          saveStoredSettings(settingsData);
+        }
+      } catch (err) {
+        console.error('Data load error:', err);
+        const fallback = loadStoredApps();
+        if (fallback && fallback.length > 0) setApps(fallback);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, [isAdminRoute]);
