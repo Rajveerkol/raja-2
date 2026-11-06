@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { AppListItem } from './components/AppListItem';
-import { AppModal } from './components/AppModal';
 import { Footer } from './components/Footer';
 import { LegalModals, LegalModalType } from './components/LegalModals';
 import { AdminPage } from './components/AdminPage';
@@ -27,7 +26,6 @@ export function App() {
     const cached = loadStoredApps();
     return !cached || cached.length === 0;
   });
-  const [activeModalApp, setActiveModalApp] = useState<AppItem | null>(null);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
   const [secretClicks, setSecretClicks] = useState(0);
 
@@ -217,7 +215,6 @@ export function App() {
                   <AppListItem
                     key={app.id}
                     app={app}
-                    onOpenDetails={(selected) => setActiveModalApp(selected)}
                   />
                 ))}
             </div>
@@ -225,13 +222,7 @@ export function App() {
         </section>
       </main>
 
-      {/* 3. Quick Details Modal */}
-      <AppModal
-        app={activeModalApp}
-        onClose={() => setActiveModalApp(null)}
-      />
-
-      {/* 4. Footer Matching Raxo */}
+      {/* 3. Footer Matching Raxo */}
       <Footer 
         settings={settings} 
         onOpenLegal={(type) => setActiveLegalModal(type)}

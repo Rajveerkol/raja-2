@@ -41,21 +41,8 @@ export async function incrementDownloads(id: string): Promise<void> {
   }
 }
 
-export function buildDownloadUrl(rawUrl: string, rawFileName?: string, appName?: string): { url: string; fileName: string } {
-  let fileName = (rawFileName || '').trim();
-  if (!fileName && appName) {
-    fileName = `${appName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.apk`;
-  }
-  if (!fileName) {
-    fileName = 'app.apk';
-  }
-  if (!fileName.toLowerCase().endsWith('.apk')) {
-    fileName += '.apk';
-  }
+import { buildCloudflareDownloadUrl } from './cloudflareClient';
 
-  let finalUrl = rawUrl;
-  if (finalUrl.startsWith('/assets/apks/')) {
-    finalUrl = `${finalUrl}?download=${encodeURIComponent(fileName)}`;
-  }
-  return { url: finalUrl, fileName };
+export function buildDownloadUrl(rawUrl: string, rawFileName?: string, appName?: string): { url: string; fileName: string; isDirect: boolean } {
+  return buildCloudflareDownloadUrl(rawUrl, rawFileName, appName);
 }

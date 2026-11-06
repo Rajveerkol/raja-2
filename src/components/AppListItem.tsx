@@ -2,56 +2,91 @@ import React, { useState } from 'react';
 import { Download, ShieldCheck, Check, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AppItem } from '../types';
-import { buildDownloadUrl, incrementDownloads } from '../apiClient';
+import { buildCloudflareDownloadUrl, incrementCloudflareDownloads } from '../cloudflareClient';
+import { incrementDownloadCount } from '../data';
 
 interface AppListItemProps {
   app: AppItem;
-  onOpenDetails: (app: AppItem) => void;
+  onOpenDetails?: (app: AppItem) => void;
 }
 
-export const AppListItem: React.FC<AppListItemProps> = ({ app, onOpenDetails }) => {
+export const AppListItem: React.FC<AppListItemProps> = ({ app }) => {
   const [downloading, setDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
-  const handleDownload = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // prevent modal opening
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (downloading) return;
 
     setDownloading(true);
 
-    // Fire confetti celebration
+    // Fire confetti celebration from click position
     try {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const x = (rect.left + rect.width / 2) / window.innerWidth;
+      const y = (rect.top + rect.height / 2) / window.innerHeight;
+
       confetti({
-        particleCount: 50,
+        particleCount: 35,
         spread: 60,
-        origin: { y: 0.8 },
-        colors: ['#10b981', '#059669', '#34d399', '#6ee7b7']
+        origin: { x, y },
+        colors: ['#10b981', '#059669', '#34d399', '#6ee7b7'],
+        disableForReducedMotion: true
       });
     } catch {}
 
-    // Atomic increment
-    incrementDownloads(app.id);
+    // Atomic increments (Local storage + Cloudflare D1)
+    incrementDownloadCount(app.id);
+    incrementCloudflareDownloads(app.id);
 
-    // Build verified R2 download URL
-    const { url, fileName } = buildDownloadUrl(app.downloadUrl, app.apkFileName, app.name);
+    if (!app.downloadUrl || !app.downloadUrl.trim() || app.downloadUrl === '#') {
+      alert(`The download link for "${app.name}" is currently being updated.`);
+      setDownloading(false);
+      return;
+    }
 
-    // Direct download trigger (no blank tab)
+    if (app.downloadUrl.startsWith('blob:')) {
+      alert(`The temporary session link for "${app.name}" has expired. Please update it in the Admin Panel with a permanent Cloud Storage or external download link.`);
+      setDownloading(false);
+      return;
+    }
+
+    // Direct APK file download & trigger Android package installer (identical to raja-1)
+    const { url: finalDownloadUrl, fileName, isDirect } = buildCloudflareDownloadUrl(
+      app.downloadUrl,
+      app.apkFileName,
+      app.name
+    );
+
     const link = document.createElement('a');
-    link.href = url;
+    link.href = finalDownloadUrl;
     link.setAttribute('download', fileName);
+
+    // CRITICAL: Do NOT set target="_blank" for direct APK downloads!
+    // Leaves target unset so Chrome & Android stay on the website and download directly in background.
+    if (!isDirect) {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+    }
+
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+
+    setTimeout(() => {
+      if (document.body.contains(link)) {
+        document.body.removeChild(link);
+      }
+    }, 200);
 
     setDownloadSuccess(true);
     setTimeout(() => {
       setDownloading(false);
       setDownloadSuccess(false);
-    }, 3000);
+    }, 2500);
   };
 
   return (
-    <div className="app-list-row" onClick={() => onOpenDetails(app)}>
+    <div className="app-list-row" onClick={handleDownload} title={`Download ${app.name} APK`}>
       {/* 1. App Logo Icon */}
       <div className="app-icon-wrapper">
         <img
@@ -62,7 +97,6 @@ export const AppListItem: React.FC<AppListItemProps> = ({ app, onOpenDetails }) 
           decoding="async"
           referrerPolicy="no-referrer"
           onError={(e) => {
-            // Fallback icon if logo fails
             (e.target as HTMLImageElement).src =
               'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="%2310b981"><rect width="100" height="100" rx="24"/><text x="50" y="55" font-size="28" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">APK</text></svg>';
           }}
@@ -88,6 +122,7 @@ export const AppListItem: React.FC<AppListItemProps> = ({ app, onOpenDetails }) 
       {/* 3. Action Download Button */}
       <div className="app-action-col">
         <button
+          type="button"
           className={`download-btn ${downloadSuccess ? 'downloaded' : ''}`}
           onClick={handleDownload}
           disabled={downloading}
@@ -106,7 +141,7 @@ export const AppListItem: React.FC<AppListItemProps> = ({ app, onOpenDetails }) 
           ) : (
             <>
               <Download size={16} className="btn-icon" />
-              <span>Download</span>
+              <span>{app.buttonText || 'Download'}</span>
             </>
           )}
         </button>
